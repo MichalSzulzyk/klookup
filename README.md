@@ -60,6 +60,22 @@ python -m generator.cli \
   --dry-run
 ```
 
+Replicate Google image model example:
+
+```bash
+python -m generator.cli \
+  --input graphics_IO_minutes/oykuakarca_input \
+  --range 1925 1925 \
+  --prompt generator/prompts/general_04_detailed.txt \
+  --template graphics_template/klookup_template.jpg \
+  --model replicate \
+  --replicate-model-id google/nano-banana-2 \
+  --refs-mode all \
+  --quality medium \
+  --max-cost-usd 1 \
+  --dry-run
+```
+
 Remove `--dry-run` to call APIs and write files.
 
 ## Reference Image Rules
@@ -73,7 +89,7 @@ Remove `--dry-run` to call APIs and write files.
 Backend summary:
 
 - `openai`: selected artist refs + optional template.
-- `replicate`: max 8 refs; template + up to 7 artist refs.
+- `replicate`: model-specific refs; `flux-2-pro` supports 8 refs, `nano-banana-2` supports 14 refs.
 - `google`: max 4 refs; template + up to 3 artist refs.
 
 ## Google Vertex Test Example

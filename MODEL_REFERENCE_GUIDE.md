@@ -21,12 +21,18 @@ Quick reference for how image references ("wsady") are handled in this project.
 
 ### Replicate
 
-- Model: `black-forest-labs/flux-2-pro`
+- Default model: `black-forest-labs/flux-2-pro`
+- Additional image model: `google/nano-banana-2`
 - Prompt: yes
 - Artist refs: selected by `--refs-mode`
 - Template: sent as layout/composition ref when provided
-- API receives: max 8 refs via `input_images`
-- Meaning: if template is used, Replicate gets template + up to 7 artist refs.
+- API receives: model-specific image field (`input_images` or `image_input`)
+- Meaning: Replicate is the easiest backend for swapping image models with refs.
+
+Replicate image model limits:
+
+- `black-forest-labs/flux-2-pro`: max 8 refs via `input_images`
+- `google/nano-banana-2`: max 14 refs via `image_input`
 
 ### Google Vertex
 
@@ -53,12 +59,12 @@ Quick reference for how image references ("wsady") are handled in this project.
 - `first` sends one artist ref plus optional template.
 - `mosaic` sends one artist mosaic plus optional template.
 
-### Replicate (Flux)
-- Treat as a multi-reference backend with FLUX.2 Pro.
+### Replicate
+- Treat as a multi-reference test backend.
 - Use:
   - `--refs-mode first` for template + one artist ref,
   - `--refs-mode mosaic` for template + one artist mosaic,
-  - or `--refs-mode all`; the CLI automatically sends template + up to 7 artist refs.
+  - or `--refs-mode all`; the CLI automatically applies the selected model's ref limit.
 
 ### Google Vertex (Imagen edit path)
 - Keep refs at 4 or less.
@@ -116,6 +122,22 @@ python -m generator.cli \
   --dry-run
 ```
 
+### Replicate Nano Banana 2 dry-run
+
+```bash
+python -m generator.cli \
+  --input graphics_IO_minutes/oykuakarca_input \
+  --range 1017 1017 \
+  --prompt generator/prompts/general_04_detailed.txt \
+  --template graphics_template/klookup_template.jpg \
+  --model replicate \
+  --replicate-model-id google/nano-banana-2 \
+  --refs-mode all \
+  --quality medium \
+  --max-cost-usd 1 \
+  --dry-run
+```
+
 ### Google Vertex dry-run
 
 ```bash
@@ -136,7 +158,7 @@ python -m generator.cli \
 1. For stable results across models, think in terms of:
    - **single ref mode** (`first` or `mosaic`) vs
    - **multi-ref mode** (`all`, useful for OpenAI and Replicate).
-2. For Replicate FLUX.2 Pro, never assume more than 8 refs are allowed.
+2. For Replicate, check each model profile and the printed `Final refs sent to API`.
 3. For Google Vertex, never assume more than 4 refs are allowed.
 4. Always check the CLI printout: `Final refs sent to API`.
 

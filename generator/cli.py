@@ -144,6 +144,7 @@ def build_ref_plan(
     out_dir: Path,
     artist_name: str,
     template_file: Path | None,
+    replicate_model_id: str | None = None,
 ) -> RefPlan:
     selected_artist_refs = apply_refs_mode(
         artist_refs,
@@ -155,7 +156,8 @@ def build_ref_plan(
     truncated = False
 
     if model == "replicate":
-        max_refs = 8
+        replicate_id = ReplicateBackend.effective_model_id(replicate_model_id)
+        max_refs = ReplicateBackend.profile_for_model(replicate_model_id).max_refs
         if template_file is not None:
             artist_slots = max_refs - 1
             final_refs = [template_file] + selected_artist_refs[:artist_slots]
@@ -164,7 +166,7 @@ def build_ref_plan(
         intended_count = len(selected_artist_refs) + (1 if template_file else 0)
         if intended_count > len(final_refs):
             truncated = True
-            notes.append("Replicate FLUX.2 Pro accepts at most 8 input_images.")
+            notes.append(f"Replicate model {replicate_id} accepts at most {max_refs} references.")
         if template_file is not None:
             notes.append("Template is sent as layout/composition reference; artist refs drive style.")
         return RefPlan(selected_artist_refs, final_refs, truncated, notes)
@@ -297,6 +299,7 @@ def main(
         out_dir=out_dir,
         artist_name=artist_name,
         template_file=template_file,
+        replicate_model_id=replicate_model_id,
     )
     prompt_template = read_prompt(prompt_file)
     est_cost = estimate_cost(model, quality, len(minutes))
