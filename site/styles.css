@@ -58,6 +58,66 @@ body {
   opacity: 1;
 }
 
+.fullscreen-button {
+  position: absolute;
+  top: clamp(1rem, 3vw, 2.5rem);
+  right: clamp(1rem, 3vw, 2.5rem);
+  z-index: 2;
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(246, 242, 232, 0.16);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    border-color 180ms ease;
+}
+
+.fullscreen-button.is-visible {
+  opacity: 0.64;
+  pointer-events: auto;
+}
+
+.fullscreen-button:hover,
+.fullscreen-button:focus-visible {
+  border-color: rgba(246, 242, 232, 0.34);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.fullscreen-button:focus-visible {
+  outline: 2px solid rgba(246, 242, 232, 0.86);
+  outline-offset: 3px;
+}
+
+.fullscreen-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.fullscreen-icon-exit,
+.fullscreen-button.is-fullscreen .fullscreen-icon-enter {
+  display: none;
+}
+
+.fullscreen-button.is-fullscreen .fullscreen-icon-exit {
+  display: block;
+}
+
 .meta {
   position: absolute;
   right: clamp(1rem, 3vw, 2.5rem);

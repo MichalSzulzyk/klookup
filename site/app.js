@@ -3,10 +3,14 @@ const layers = [...document.querySelectorAll("[data-layer]")];
 const timeEl = document.querySelector("[data-time]");
 const artistEl = document.querySelector("[data-artist]");
 const statusEl = document.querySelector("[data-status]");
+const fullscreenButton = document.querySelector("[data-fullscreen-button]");
+const CONTROLS_HIDE_DELAY_MS = 2800;
 
 let minuteMap = new Map();
 let activeLayer = 0;
 let timerId = null;
+let controlsTimerId = null;
+let controlsPinned = false;
 
 function currentHHMM() {
   const params = new URLSearchParams(window.location.search);
@@ -61,6 +65,83 @@ function showStatus(message) {
   statusEl.hidden = !message;
 }
 
+function updateFullscreenButton() {
+  if (!fullscreenButton) {
+    return;
+  }
+
+  const isFullscreen = Boolean(document.fullscreenElement);
+  fullscreenButton.classList.toggle("is-fullscreen", isFullscreen);
+  fullscreenButton.setAttribute(
+    "aria-label",
+    isFullscreen ? "Wyłącz pełny ekran" : "Włącz pełny ekran",
+  );
+}
+
+function hideControls() {
+  if (controlsPinned) {
+    return;
+  }
+  fullscreenButton?.classList.remove("is-visible");
+}
+
+function showControls() {
+  if (!fullscreenButton || fullscreenButton.hidden) {
+    return;
+  }
+
+  fullscreenButton.classList.add("is-visible");
+  window.clearTimeout(controlsTimerId);
+  controlsTimerId = window.setTimeout(hideControls, CONTROLS_HIDE_DELAY_MS);
+}
+
+async function toggleFullscreen() {
+  if (!document.fullscreenEnabled) {
+    return;
+  }
+
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else {
+      await document.documentElement.requestFullscreen();
+    }
+  } catch (error) {
+    showStatus("Nie udało się przełączyć trybu pełnego ekranu.");
+  }
+}
+
+function setupFullscreen() {
+  if (!fullscreenButton || !document.fullscreenEnabled) {
+    return;
+  }
+
+  fullscreenButton.hidden = false;
+  fullscreenButton.addEventListener("click", toggleFullscreen);
+  fullscreenButton.addEventListener("pointerenter", () => {
+    controlsPinned = true;
+    showControls();
+  });
+  fullscreenButton.addEventListener("pointerleave", () => {
+    controlsPinned = false;
+    showControls();
+  });
+  fullscreenButton.addEventListener("focus", () => {
+    controlsPinned = true;
+    showControls();
+  });
+  fullscreenButton.addEventListener("blur", () => {
+    controlsPinned = false;
+    showControls();
+  });
+  window.addEventListener("pointermove", showControls, { passive: true });
+  window.addEventListener("touchstart", showControls, { passive: true });
+  window.addEventListener("keydown", showControls);
+  document.addEventListener("fullscreenchange", updateFullscreenButton);
+  updateFullscreenButton();
+  showControls();
+}
+
 function renderMinute(hhmm) {
   const record = minuteMap.get(hhmm);
   timeEl.textContent = record?.label ?? `${hhmm.slice(0, 2)}:${hhmm.slice(2)}`;
@@ -110,6 +191,7 @@ function scheduleTick() {
 
 async function init() {
   try {
+    setupFullscreen();
     const response = await fetch("minutes.json", { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);

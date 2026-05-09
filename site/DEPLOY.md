@@ -5,7 +5,9 @@ deploy. Upload the contents of `dist` to a static host.
 
 ## Recommended Host
 
-Start with Cloudflare Pages:
+Start with Cloudflare Pages and deploy with Wrangler CLI. The dashboard's direct
+upload flow has a 1000-file limit, and this project currently has more files
+than that.
 
 1. Build the site locally:
 
@@ -13,11 +15,16 @@ Start with Cloudflare Pages:
    .venv/bin/python site/build.py
    ```
 
-2. Open the Cloudflare dashboard and create a Pages project.
-3. Choose a direct/manual upload flow.
-4. Upload the contents of `dist`.
-5. After the preview URL works, attach the final domain in the Pages project
-   settings.
+2. Deploy `dist` with Wrangler:
+
+   ```bash
+   npx wrangler pages deploy dist --project-name klookup --commit-dirty=true
+   ```
+
+3. If Wrangler asks to create the project, choose `Create a new project` and use
+   `main` as the production branch.
+4. After the `*.pages.dev` preview URL works, attach the final domain in the
+   Pages project settings.
 
 Upload the files inside `dist`, not the source folders such as
 `graphics_IO_minutes` or `site`.
@@ -32,7 +39,11 @@ images again:
 ```
 
 Then upload the updated `dist/minutes.json` and, if changed, `dist/index.html`,
-`dist/styles.css`, or `dist/app.js`.
+`dist/styles.css`, or `dist/app.js` with the same Wrangler command:
+
+```bash
+npx wrangler pages deploy dist --project-name klookup --commit-dirty=true
+```
 
 ## Current Build Shape
 
@@ -47,6 +58,8 @@ Then upload the updated `dist/minutes.json` and, if changed, `dist/index.html`,
 - `dist` is generated and ignored by git.
 - The asset source folders are also ignored by git, so this is currently a
   local/manual publishing workflow.
+- The dashboard direct upload path is useful only for smaller builds. Use
+  Wrangler for this project.
 - If manual uploads become inconvenient, the next step is to move image hosting
   to object storage such as Cloudflare R2 or automate uploads with a deploy
   script.
