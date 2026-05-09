@@ -11,12 +11,12 @@ from PIL import Image
 from tqdm import tqdm
 
 try:
-    from generator.backends import GoogleBackend, OpenAIBackend, ReplicateBackend
+    from generator.backends import OpenAIBackend, ReplicateBackend
     from generator.cost import estimate_cost
     from generator.naming import build_filename, build_sidecar_filename, find_latest
     from generator.validate import validate_to_jpeg_1920x1080
 except ModuleNotFoundError:
-    from backends import GoogleBackend, OpenAIBackend, ReplicateBackend
+    from backends import OpenAIBackend, ReplicateBackend
     from cost import estimate_cost
     from naming import build_filename, build_sidecar_filename, find_latest
     from validate import validate_to_jpeg_1920x1080
@@ -66,18 +66,6 @@ def load_backend(model: str, replicate_model_id: str | None = None):
         if not key:
             raise click.ClickException("REPLICATE_API_TOKEN missing in environment/.env")
         return ReplicateBackend(key, model_id=replicate_model_id)
-    if model == "google":
-        import os
-
-        project = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GOOGLE_VERTEX_PROJECT")
-        location = os.getenv("GOOGLE_CLOUD_LOCATION") or os.getenv("GOOGLE_VERTEX_LOCATION")
-        if not (project and location):
-            raise click.ClickException(
-                "For --model google (Vertex-only): set GOOGLE_CLOUD_PROJECT and "
-                "GOOGLE_CLOUD_LOCATION (or GOOGLE_VERTEX_PROJECT / GOOGLE_VERTEX_LOCATION), "
-                "then authenticate with Application Default Credentials."
-            )
-        return GoogleBackend()
     raise click.ClickException(f"Unsupported model backend: {model}")
 
 
@@ -171,21 +159,6 @@ def build_ref_plan(
             notes.append("Template is sent as layout/composition reference; artist refs drive style.")
         return RefPlan(selected_artist_refs, final_refs, truncated, notes)
 
-    if model == "google":
-        max_refs = 4
-        if template_file is not None:
-            artist_slots = max_refs - 1
-            final_refs = [template_file] + selected_artist_refs[:artist_slots]
-        else:
-            final_refs = selected_artist_refs[:max_refs]
-        intended_count = len(selected_artist_refs) + (1 if template_file else 0)
-        if intended_count > len(final_refs):
-            truncated = True
-            notes.append("Google Vertex edit_image accepts at most 4 references.")
-        if template_file is not None:
-            notes.append("Template is sent as layout/composition reference; artist refs drive style.")
-        return RefPlan(selected_artist_refs, final_refs, truncated, notes)
-
     if model == "openai":
         final_refs = selected_artist_refs + ([template_file] if template_file is not None else [])
         if template_file is not None:
@@ -198,13 +171,6 @@ def build_ref_plan(
 def add_reference_guidance(prompt: str, model: str, plan: RefPlan, template_file: Path | None) -> str:
     if not plan.final_refs:
         return prompt
-
-    if model == "google" and template_file is not None:
-        return (
-            "Reference [1] is the clock template: use it only for composition, layout, "
-            "and placement of clock elements. Use the remaining references for the artist's "
-            f"visual style. {prompt}"
-        )
 
     if model == "openai" and template_file is not None:
         return (
@@ -242,7 +208,7 @@ def refs_count_for_mode(refs_count: int, refs_mode: str) -> int:
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="Optional template image used as composition guidance.",
 )
-@click.option("--model", required=True, type=click.Choice(["openai", "replicate", "google"]))
+@click.option("--model", required=True, type=click.Choice(["openai", "replicate"]))
 @click.option(
     "--replicate-model-id",
     default=None,

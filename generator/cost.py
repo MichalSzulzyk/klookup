@@ -11,11 +11,6 @@ COST_PER_IMAGE_USD: dict[str, dict[str, float]] = {
         "medium": 0.06,
         "high": 0.08,
     },
-    "google": {
-        "low": 0.02,
-        "medium": 0.04,
-        "high": 0.08,
-    },
 }
 
 

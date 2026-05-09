@@ -34,15 +34,6 @@ Replicate image model limits:
 - `black-forest-labs/flux-2-pro`: max 8 refs via `input_images`
 - `google/nano-banana-2`: max 14 refs via `image_input`
 
-### Google Vertex
-
-- Model: `imagen-4.0-generate-001`
-- Prompt: yes
-- Artist refs: selected by `--refs-mode`
-- Template: sent as layout/composition ref when provided
-- API receives: max 4 refs via `edit_image`
-- Meaning: if template is used, Google gets template + up to 3 artist refs.
-
 ## Important Notes
 
 - `--input` points to artist reference images (the "input refs").
@@ -66,25 +57,19 @@ Replicate image model limits:
   - `--refs-mode mosaic` for template + one artist mosaic,
   - or `--refs-mode all`; the CLI automatically applies the selected model's ref limit.
 
-### Google Vertex (Imagen edit path)
-- Keep refs at 4 or less.
-- Use:
-  - `--refs-mode first` (single ref),
-  - or `--refs-mode mosaic` (single mosaic ref),
-  - or `--refs-mode all`; the CLI automatically sends template + up to 3 artist refs.
-
 ## Expected CLI Printout
 
 Before generation, check this block:
 
 ```text
-Artist refs count: 7
-Selected artist refs count: 7
-Final refs sent to API count: 4
+Artist refs count: 9
+Selected artist refs count: 9
+Final refs sent to API count: 8
   [1] graphics_template/klookup_template.jpg
   [2] graphics_IO_minutes/oykuakarca_input/example-1.jpg
   [3] graphics_IO_minutes/oykuakarca_input/example-2.jpg
-  [4] graphics_IO_minutes/oykuakarca_input/example-3.jpg
+  ...
+  [8] graphics_IO_minutes/oykuakarca_input/example-7.jpg
 Warning: refs were truncated for this model/backend limit.
 ```
 
@@ -138,27 +123,11 @@ python -m generator.cli \
   --dry-run
 ```
 
-### Google Vertex dry-run
-
-```bash
-python -m generator.cli \
-  --input graphics_IO_minutes/oykuakarca_input \
-  --range 1017 1017 \
-  --prompt generator/prompts/general_04_detailed.txt \
-  --template graphics_template/klookup_template.jpg \
-  --model google \
-  --refs-mode all \
-  --quality high \
-  --max-cost-usd 1 \
-  --dry-run
-```
-
 ## Recommended Operating Rules
 
 1. For stable results across models, think in terms of:
    - **single ref mode** (`first` or `mosaic`) vs
    - **multi-ref mode** (`all`, useful for OpenAI and Replicate).
 2. For Replicate, check each model profile and the printed `Final refs sent to API`.
-3. For Google Vertex, never assume more than 4 refs are allowed.
-4. Always check the CLI printout: `Final refs sent to API`.
+3. Always check the CLI printout: `Final refs sent to API`.
 

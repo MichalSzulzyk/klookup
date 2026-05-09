@@ -13,20 +13,11 @@ pip install -r generator/requirements.txt
 cp .env.example .env
 ```
 
-Fill `.env` with your API keys / Vertex settings.
-
-For Google Vertex:
-
-```bash
-gcloud auth application-default login
-```
-
-Required `.env` values:
+Fill `.env` with the API keys for the backends you want to use:
 
 ```env
-GOOGLE_CLOUD_PROJECT=your-project-id
-GOOGLE_CLOUD_LOCATION=your-region
-GOOGLE_GENAI_USE_VERTEXAI=true
+OPENAI_API_KEY=
+REPLICATE_API_TOKEN=
 ```
 
 ## Generate (example)
@@ -60,7 +51,7 @@ python -m generator.cli \
   --dry-run
 ```
 
-Replicate Google image model example:
+Replicate Nano Banana 2 example:
 
 ```bash
 python -m generator.cli \
@@ -90,22 +81,6 @@ Backend summary:
 
 - `openai`: selected artist refs + optional template.
 - `replicate`: model-specific refs; `flux-2-pro` supports 8 refs, `nano-banana-2` supports 14 refs.
-- `google`: max 4 refs; template + up to 3 artist refs.
-
-## Google Vertex Test Example
-
-```bash
-python -m generator.cli \
-  --input graphics_IO_minutes/oykuakarca_input \
-  --range 1017 1017 \
-  --prompt generator/prompts/general_04_detailed.txt \
-  --template graphics_template/klookup_template.jpg \
-  --model google \
-  --refs-mode all \
-  --quality high \
-  --max-cost-usd 1 \
-  --dry-run
-```
 
 Remove `--dry-run` after checking the printed refs.
 
