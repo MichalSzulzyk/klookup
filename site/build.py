@@ -45,6 +45,17 @@ def parse_args() -> argparse.Namespace:
         default="contain",
         help="Use contain to preserve the full image or cover to crop to 16:9.",
     )
+    parser.add_argument(
+        "--jpg-fallback",
+        action="store_true",
+        help="Also write JPG fallbacks. This roughly doubles build size.",
+    )
+    parser.add_argument(
+        "--webp-quality",
+        type=int,
+        default=78,
+        help="WebP quality from 1 to 100.",
+    )
     return parser.parse_args()
 
 
@@ -135,7 +146,13 @@ def time_label(hhmm: str) -> str:
     return f"{hhmm[:2]}:{hhmm[2:]}"
 
 
-def prepare_image(image_path: Path, webp_path: Path, jpg_path: Path, fit: str) -> None:
+def prepare_image(
+    image_path: Path,
+    webp_path: Path,
+    jpg_path: Path | None,
+    fit: str,
+    webp_quality: int,
+) -> None:
     with Image.open(image_path) as image:
         image = ImageOps.exif_transpose(image).convert("RGB")
         if fit == "cover":
@@ -148,8 +165,9 @@ def prepare_image(image_path: Path, webp_path: Path, jpg_path: Path, fit: str) -
                 color=(0, 0, 0),
                 centering=(0.5, 0.5),
             )
-        image.save(webp_path, "WEBP", quality=82, method=6)
-        image.save(jpg_path, "JPEG", quality=84, optimize=True, progressive=True)
+        image.save(webp_path, "WEBP", quality=webp_quality, method=4)
+        if jpg_path is not None:
+            image.save(jpg_path, "JPEG", quality=84, optimize=True, progressive=True)
 
 
 def copy_static_files(dist_dir: Path) -> None:
@@ -163,6 +181,8 @@ def build_index(
     dist_dir: Path,
     limit: int | None,
     fit: str,
+    jpg_fallback: bool,
+    webp_quality: int,
 ) -> dict[str, Any]:
     assets_dir = dist_dir / "assets" / "minutes"
     assets_dir.mkdir(parents=True, exist_ok=True)
@@ -191,8 +211,8 @@ def build_index(
             continue
 
         webp_path = assets_dir / f"{hhmm}.webp"
-        jpg_path = assets_dir / f"{hhmm}.jpg"
-        prepare_image(source.image_path, webp_path, jpg_path, fit)
+        jpg_path = assets_dir / f"{hhmm}.jpg" if jpg_fallback else None
+        prepare_image(source.image_path, webp_path, jpg_path, fit, webp_quality)
 
         artist_data = artists.get(source.artist or "", {})
         artist_name = artist_data.get("name") or source.artist
@@ -202,7 +222,7 @@ def build_index(
                 "hhmm": hhmm,
                 "label": time_label(hhmm),
                 "image": f"assets/minutes/{hhmm}.webp",
-                "fallbackImage": f"assets/minutes/{hhmm}.jpg",
+                "fallbackImage": f"assets/minutes/{hhmm}.jpg" if jpg_fallback else None,
                 "artist": source.artist,
                 "artistName": artist_name,
                 "portfolioUrl": portfolio_url,
@@ -228,7 +248,15 @@ def main() -> None:
 
     artists = load_artists()
     sources = discover_blanks(discover_generated())
-    index = build_index(sources, artists, dist_dir, args.limit, args.fit)
+    index = build_index(
+        sources,
+        artists,
+        dist_dir,
+        args.limit,
+        args.fit,
+        args.jpg_fallback,
+        args.webp_quality,
+    )
 
     (dist_dir / "minutes.json").write_text(
         json.dumps(index, ensure_ascii=False, indent=2) + "\n",
