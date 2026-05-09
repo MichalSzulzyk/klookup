@@ -1,6 +1,6 @@
 const minuteLink = document.querySelector("[data-minute-link]");
 const layers = [...document.querySelectorAll("[data-layer]")];
-const timeEl = document.querySelector("[data-time]");
+const metaEl = document.querySelector(".meta");
 const artistEl = document.querySelector("[data-artist]");
 const statusEl = document.querySelector("[data-status]");
 const fullscreenButton = document.querySelector("[data-fullscreen-button]");
@@ -144,10 +144,9 @@ function setupFullscreen() {
 
 function renderMinute(hhmm) {
   const record = minuteMap.get(hhmm);
-  timeEl.textContent = record?.label ?? `${hhmm.slice(0, 2)}:${hhmm.slice(2)}`;
 
   if (!record?.image) {
-    artistEl.textContent = "Ta minuta nie ma jeszcze obrazu.";
+    metaEl.hidden = true;
     setLink(null);
     showStatus("Brak pliku dla tej minuty. Dodaj wygenerowany obraz albo blank minute.");
     return;
@@ -175,9 +174,17 @@ function renderMinute(hhmm) {
   layers[activeLayer].classList.remove("is-active");
   activeLayer = nextLayer;
 
-  artistEl.textContent = record.artistName ?? "Blank minute";
+  if (record.artistName) {
+    artistEl.textContent = record.artistName;
+    metaEl.hidden = false;
+  } else {
+    artistEl.textContent = "";
+    metaEl.hidden = true;
+  }
   setLink(record);
-  showStatus(record.portfolioUrl ? "" : "Portfolio dla tego artysty nie jest jeszcze uzupełnione.");
+  showStatus(
+    record.artist && !record.portfolioUrl ? "Portfolio dla tego artysty nie jest jeszcze uzupełnione." : "",
+  );
   preload(minuteMap.get(nextHHMM(hhmm)));
 }
 
@@ -201,7 +208,7 @@ async function init() {
     renderMinute(currentHHMM());
     scheduleTick();
   } catch (error) {
-    timeEl.textContent = "--:--";
+    metaEl.hidden = true;
     artistEl.textContent = "Nie udało się wczytać minutes.json.";
     showStatus(error.message);
   }

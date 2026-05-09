@@ -8,28 +8,29 @@
   </head>
   <body>
     <main class="clock" aria-live="polite">
-      <a class="minute-link" data-minute-link aria-label="Otwórz portfolio artysty">
-        <img class="minute-image is-active" data-layer="0" alt="" />
-        <img class="minute-image" data-layer="1" alt="" />
-      </a>
-      <button
-        class="fullscreen-button"
-        type="button"
-        data-fullscreen-button
-        aria-label="Włącz pełny ekran"
-        hidden
-      >
-        <svg class="fullscreen-icon fullscreen-icon-enter" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
-        </svg>
-        <svg class="fullscreen-icon fullscreen-icon-exit" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
-        </svg>
-      </button>
-      <section class="meta">
-        <p class="time" data-time>--:--</p>
-        <p class="artist" data-artist>Ładowanie minut...</p>
-      </section>
+      <div class="stage">
+        <a class="minute-link" data-minute-link aria-label="Otwórz portfolio artysty">
+          <img class="minute-image is-active" data-layer="0" alt="" />
+          <img class="minute-image" data-layer="1" alt="" />
+        </a>
+        <button
+          class="fullscreen-button"
+          type="button"
+          data-fullscreen-button
+          aria-label="Włącz pełny ekran"
+          hidden
+        >
+          <svg class="fullscreen-icon fullscreen-icon-enter" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+          </svg>
+          <svg class="fullscreen-icon fullscreen-icon-exit" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
+          </svg>
+        </button>
+        <section class="meta">
+          <p class="artist" data-artist>Ładowanie minut...</p>
+        </section>
+      </div>
       <p class="status" data-status hidden></p>
     </main>
     <script src="app.js" defer></script>
