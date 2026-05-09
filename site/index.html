@@ -9,10 +9,10 @@
   <body>
     <main class="clock" aria-live="polite">
       <div class="stage">
-        <a class="minute-link" data-minute-link aria-label="Otwórz portfolio artysty">
+        <div class="minute-frame">
           <img class="minute-image is-active" data-layer="0" alt="" />
           <img class="minute-image" data-layer="1" alt="" />
-        </a>
+        </div>
         <button
           class="fullscreen-button"
           type="button"
@@ -27,6 +27,15 @@
             <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
           </svg>
         </button>
+        <a
+          class="portfolio-button"
+          data-portfolio-link
+          target="_blank"
+          rel="noopener noreferrer"
+          hidden
+        >
+          View portfolio
+        </a>
         <section class="meta">
           <p class="artist" data-artist>Ładowanie minut...</p>
         </section>

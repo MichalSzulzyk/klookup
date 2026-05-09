@@ -1,9 +1,9 @@
-const minuteLink = document.querySelector("[data-minute-link]");
 const layers = [...document.querySelectorAll("[data-layer]")];
 const metaEl = document.querySelector(".meta");
 const artistEl = document.querySelector("[data-artist]");
 const statusEl = document.querySelector("[data-status]");
 const fullscreenButton = document.querySelector("[data-fullscreen-button]");
+const portfolioLink = document.querySelector("[data-portfolio-link]");
 const CONTROLS_HIDE_DELAY_MS = 2800;
 
 let minuteMap = new Map();
@@ -47,17 +47,22 @@ function preload(record) {
   image.src = record.image;
 }
 
-function setLink(record) {
+function visibleControls() {
+  return [fullscreenButton, portfolioLink].filter((control) => control && !control.hidden);
+}
+
+function setPortfolioLink(record) {
   if (record?.portfolioUrl) {
-    minuteLink.href = record.portfolioUrl;
-    minuteLink.target = "_blank";
-    minuteLink.rel = "noopener noreferrer";
+    portfolioLink.href = record.portfolioUrl;
+    portfolioLink.hidden = false;
+    portfolioLink.setAttribute("aria-label", `View portfolio: ${record.artistName ?? record.artist}`);
     return;
   }
 
-  minuteLink.removeAttribute("href");
-  minuteLink.removeAttribute("target");
-  minuteLink.removeAttribute("rel");
+  portfolioLink.hidden = true;
+  portfolioLink.classList.remove("is-visible");
+  portfolioLink.removeAttribute("href");
+  portfolioLink.removeAttribute("aria-label");
 }
 
 function showStatus(message) {
@@ -82,17 +87,39 @@ function hideControls() {
   if (controlsPinned) {
     return;
   }
-  fullscreenButton?.classList.remove("is-visible");
+  visibleControls().forEach((control) => control.classList.remove("is-visible"));
 }
 
 function showControls() {
-  if (!fullscreenButton || fullscreenButton.hidden) {
+  const controls = visibleControls();
+  if (!controls.length) {
     return;
   }
 
-  fullscreenButton.classList.add("is-visible");
+  controls.forEach((control) => control.classList.add("is-visible"));
   window.clearTimeout(controlsTimerId);
   controlsTimerId = window.setTimeout(hideControls, CONTROLS_HIDE_DELAY_MS);
+}
+
+function pinControls() {
+  controlsPinned = true;
+  showControls();
+}
+
+function releaseControls() {
+  controlsPinned = false;
+  showControls();
+}
+
+function bindPinnedControl(control) {
+  if (!control) {
+    return;
+  }
+
+  control.addEventListener("pointerenter", pinControls);
+  control.addEventListener("pointerleave", releaseControls);
+  control.addEventListener("focus", pinControls);
+  control.addEventListener("blur", releaseControls);
 }
 
 async function toggleFullscreen() {
@@ -112,33 +139,21 @@ async function toggleFullscreen() {
 }
 
 function setupFullscreen() {
-  if (!fullscreenButton || !document.fullscreenEnabled) {
-    return;
+  if (fullscreenButton && document.fullscreenEnabled) {
+    fullscreenButton.hidden = false;
+    fullscreenButton.addEventListener("click", toggleFullscreen);
+    document.addEventListener("fullscreenchange", updateFullscreenButton);
+    updateFullscreenButton();
   }
+}
 
-  fullscreenButton.hidden = false;
-  fullscreenButton.addEventListener("click", toggleFullscreen);
-  fullscreenButton.addEventListener("pointerenter", () => {
-    controlsPinned = true;
-    showControls();
-  });
-  fullscreenButton.addEventListener("pointerleave", () => {
-    controlsPinned = false;
-    showControls();
-  });
-  fullscreenButton.addEventListener("focus", () => {
-    controlsPinned = true;
-    showControls();
-  });
-  fullscreenButton.addEventListener("blur", () => {
-    controlsPinned = false;
-    showControls();
-  });
+function setupControls() {
+  setupFullscreen();
+  bindPinnedControl(fullscreenButton);
+  bindPinnedControl(portfolioLink);
   window.addEventListener("pointermove", showControls, { passive: true });
   window.addEventListener("touchstart", showControls, { passive: true });
   window.addEventListener("keydown", showControls);
-  document.addEventListener("fullscreenchange", updateFullscreenButton);
-  updateFullscreenButton();
   showControls();
 }
 
@@ -147,7 +162,7 @@ function renderMinute(hhmm) {
 
   if (!record?.image) {
     metaEl.hidden = true;
-    setLink(null);
+    setPortfolioLink(null);
     showStatus("Brak pliku dla tej minuty. Dodaj wygenerowany obraz albo blank minute.");
     return;
   }
@@ -181,10 +196,9 @@ function renderMinute(hhmm) {
     artistEl.textContent = "";
     metaEl.hidden = true;
   }
-  setLink(record);
-  showStatus(
-    record.artist && !record.portfolioUrl ? "Portfolio dla tego artysty nie jest jeszcze uzupełnione." : "",
-  );
+  setPortfolioLink(record);
+  showStatus("");
+  showControls();
   preload(minuteMap.get(nextHHMM(hhmm)));
 }
 
@@ -198,7 +212,7 @@ function scheduleTick() {
 
 async function init() {
   try {
-    setupFullscreen();
+    setupControls();
     const response = await fetch("minutes.json", { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);

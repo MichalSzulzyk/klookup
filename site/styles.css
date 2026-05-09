@@ -39,16 +39,9 @@ body {
   overflow: hidden;
 }
 
-.minute-link {
+.minute-frame {
   position: absolute;
   inset: 0;
-  display: block;
-  color: inherit;
-  cursor: default;
-}
-
-.minute-link[href] {
-  cursor: pointer;
 }
 
 .minute-image {
@@ -123,6 +116,47 @@ body {
 
 .fullscreen-button.is-fullscreen .fullscreen-icon-exit {
   display: block;
+}
+
+.portfolio-button {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(0.85rem, 1.8vw, 1.45rem);
+  z-index: 2;
+  transform: translateX(-50%);
+  padding: 0.65rem 1rem;
+  border: 1px solid rgba(246, 242, 232, 0.16);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: clamp(0.86rem, 1.6vw, 1rem);
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  opacity: 0;
+  pointer-events: none;
+  backdrop-filter: blur(14px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    border-color 180ms ease;
+}
+
+.portfolio-button.is-visible {
+  opacity: 0.78;
+  pointer-events: auto;
+}
+
+.portfolio-button:hover,
+.portfolio-button:focus-visible {
+  border-color: rgba(246, 242, 232, 0.34);
+  opacity: 1;
+  transform: translate(-50%, -1px);
+}
+
+.portfolio-button:focus-visible {
+  outline: 2px solid rgba(246, 242, 232, 0.86);
+  outline-offset: 3px;
 }
 
 .meta {
