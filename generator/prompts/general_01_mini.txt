@@ -1,0 +1,6 @@
+Produce minute images based on the attached graphics. 
+The minutes should be different from one another. 
+Remember to include a nice background and make sure the style of the 
+minute images reflects the artist’s style. 
+Place the minute digits in the correct areas according to the 
+file klookup_template.jpg — that file is only a reference.

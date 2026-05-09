@@ -1,0 +1,4 @@
+Create a 16:9 wide landscape image that clearly shows the time {HH}:{MM}.
+The digits must be the main focal point and very readable.
+Use the style of the provided reference images: playful children's-book look, hand-painted texture, lively composition.
+No watermarks, no extra text, no logos.

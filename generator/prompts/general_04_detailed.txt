@@ -1,0 +1,25 @@
+Create one final 16:9 artwork for time {HH}:{MM}.
+
+Goal priority (strict order):
+1) The time {HH}:{MM} must be instantly readable.
+2) The artwork must strongly match the style of the attached artist reference images.
+3) The composition must follow the attached klookup template layout.
+
+Layout rules:
+- Place exactly 4 digits and 1 colon as HH:MM in the central template digit slots.
+- Keep all digits fully inside those slots.
+- Digits must be large, high-contrast, clean-edged, and easy to read at first glance.
+- Keep a rich full-bleed background, but never reduce digit readability.
+
+Style rules:
+- Reuse the artist’s visual language from references: brush texture, line quality, palette, motifs, atmosphere.
+- Keep the image detailed and polished: layered foreground/midground/background, subtle lighting, fine texture details.
+- Preserve stylistic coherence across the whole frame.
+
+Template rule:
+- Use klookup_template.jpg only for geometry and placement guidance.
+- Do NOT copy template helper text, boxes, labels, or technical marks.
+
+Output constraints:
+- Landscape 16:9 composition.
+- No watermark, no logo, no extra text besides the time.

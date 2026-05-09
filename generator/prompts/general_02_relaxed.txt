@@ -1,0 +1,17 @@
+Create a wide 16:9 illustration that displays the time {HH}:{MM} as the main focal point.
+
+Use all provided reference images:
+- artist references define visual style, brushwork, colors, characters, and mood
+- the lookup_template.jpg template defines ONLY composition and digit placement
+
+Hard requirements:
+1) Place exactly four digits and one colon as HH:MM, centered in the middle area.
+2) Digits must stay inside the designated four digit slots from the template layout.
+3) Keep a clean 16:9 landscape composition.
+4) No extra text, no watermark, no logo, no UI elements.
+
+Important:
+- Use the template only as layout guidance, do not copy its background, helper text, or technical markings.
+- Preserve the artist's style from reference images while respecting the template geometry.
+- make each picture different 
+- keep an eye on details 
