@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -68,15 +69,15 @@ def load_backend(model: str, replicate_model_id: str | None = None):
     if model == "google":
         import os
 
-        key = os.getenv("GOOGLE_API_KEY")
         project = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GOOGLE_VERTEX_PROJECT")
         location = os.getenv("GOOGLE_CLOUD_LOCATION") or os.getenv("GOOGLE_VERTEX_LOCATION")
-        if not key and not (project and location):
+        if not (project and location):
             raise click.ClickException(
-                "For --model google: set GOOGLE_API_KEY, or set GOOGLE_CLOUD_PROJECT and "
-                "GOOGLE_CLOUD_LOCATION (Vertex AI; needed for reference images / template)."
+                "For --model google (Vertex-only): set GOOGLE_CLOUD_PROJECT and "
+                "GOOGLE_CLOUD_LOCATION (or GOOGLE_VERTEX_PROJECT / GOOGLE_VERTEX_LOCATION), "
+                "then authenticate with Application Default Credentials."
             )
-        return GoogleBackend(api_key=key)
+        return GoogleBackend()
     raise click.ClickException(f"Unsupported model backend: {model}")
 
 
@@ -118,6 +119,14 @@ def build_mosaic_ref(refs: list[Path], out_dir: Path, artist_name: str) -> Path:
     return mosaic_path
 
 
+@dataclass
+class RefPlan:
+    selected_artist_refs: list[Path]
+    final_refs: list[Path]
+    truncated_for_model_limit: bool
+    notes: list[str]
+
+
 def apply_refs_mode(refs: list[Path], refs_mode: str, out_dir: Path, artist_name: str) -> list[Path]:
     if refs_mode == "all":
         return refs
@@ -126,6 +135,90 @@ def apply_refs_mode(refs: list[Path], refs_mode: str, out_dir: Path, artist_name
     if refs_mode == "mosaic":
         return [build_mosaic_ref(refs, out_dir=out_dir, artist_name=artist_name)]
     raise click.ClickException(f"Unsupported refs mode: {refs_mode}")
+
+
+def build_ref_plan(
+    model: str,
+    artist_refs: list[Path],
+    refs_mode: str,
+    out_dir: Path,
+    artist_name: str,
+    template_file: Path | None,
+) -> RefPlan:
+    selected_artist_refs = apply_refs_mode(
+        artist_refs,
+        refs_mode=refs_mode,
+        out_dir=out_dir,
+        artist_name=artist_name,
+    )
+    notes: list[str] = []
+    truncated = False
+
+    if model == "replicate":
+        max_refs = 8
+        if template_file is not None:
+            artist_slots = max_refs - 1
+            final_refs = [template_file] + selected_artist_refs[:artist_slots]
+        else:
+            final_refs = selected_artist_refs[:max_refs]
+        intended_count = len(selected_artist_refs) + (1 if template_file else 0)
+        if intended_count > len(final_refs):
+            truncated = True
+            notes.append("Replicate FLUX.2 Pro accepts at most 8 input_images.")
+        if template_file is not None:
+            notes.append("Template is sent as layout/composition reference; artist refs drive style.")
+        return RefPlan(selected_artist_refs, final_refs, truncated, notes)
+
+    if model == "google":
+        max_refs = 4
+        if template_file is not None:
+            artist_slots = max_refs - 1
+            final_refs = [template_file] + selected_artist_refs[:artist_slots]
+        else:
+            final_refs = selected_artist_refs[:max_refs]
+        intended_count = len(selected_artist_refs) + (1 if template_file else 0)
+        if intended_count > len(final_refs):
+            truncated = True
+            notes.append("Google Vertex edit_image accepts at most 4 references.")
+        if template_file is not None:
+            notes.append("Template is sent as layout/composition reference; artist refs drive style.")
+        return RefPlan(selected_artist_refs, final_refs, truncated, notes)
+
+    if model == "openai":
+        final_refs = selected_artist_refs + ([template_file] if template_file is not None else [])
+        if template_file is not None:
+            notes.append("Template is sent after artist refs and should be treated as layout only.")
+        return RefPlan(selected_artist_refs, final_refs, truncated, notes)
+
+    raise click.ClickException(f"Unsupported model backend: {model}")
+
+
+def add_reference_guidance(prompt: str, model: str, plan: RefPlan, template_file: Path | None) -> str:
+    if not plan.final_refs:
+        return prompt
+
+    if model == "google" and template_file is not None:
+        return (
+            "Reference [1] is the clock template: use it only for composition, layout, "
+            "and placement of clock elements. Use the remaining references for the artist's "
+            f"visual style. {prompt}"
+        )
+
+    if model == "openai" and template_file is not None:
+        return (
+            "Use the artist reference images for style, palette, texture, and visual language. "
+            "Use the template reference only for clock composition and layout. "
+            f"{prompt}"
+        )
+
+    if model == "replicate" and template_file is not None:
+        return (
+            "Reference [1] is the clock template: use it only for composition, layout, "
+            "and placement of clock elements. Use the remaining references for the artist's "
+            f"visual style. {prompt}"
+        )
+
+    return prompt
 
 
 def refs_count_for_mode(refs_count: int, refs_mode: str) -> int:
@@ -196,9 +289,15 @@ def main(
     if len(minutes) > minutes_limit:
         raise click.ClickException(f"Range has {len(minutes)} minutes, exceeds --minutes-limit={minutes_limit}")
 
-    base_refs = list_refs(input_dir)
-    if template_file is not None:
-        base_refs = [template_file] + base_refs
+    artist_refs = list_refs(input_dir)
+    ref_plan = build_ref_plan(
+        model=model,
+        artist_refs=artist_refs,
+        refs_mode=refs_mode,
+        out_dir=out_dir,
+        artist_name=artist_name,
+        template_file=template_file,
+    )
     prompt_template = read_prompt(prompt_file)
     est_cost = estimate_cost(model, quality, len(minutes))
     click.echo(f"Artist: {artist_name}")
@@ -208,8 +307,15 @@ def main(
         click.echo(f"Replicate model override: {replicate_model_id}")
     click.echo(f"Refs mode: {refs_mode}")
     click.echo(f"Template: {template_file if template_file else 'none'}")
-    click.echo(f"Base refs count: {len(base_refs)}")
-    click.echo(f"Selected refs count: {refs_count_for_mode(len(base_refs), refs_mode)}")
+    click.echo(f"Artist refs count: {len(artist_refs)}")
+    click.echo(f"Selected artist refs count: {len(ref_plan.selected_artist_refs)}")
+    click.echo(f"Final refs sent to API count: {len(ref_plan.final_refs)}")
+    for idx, ref in enumerate(ref_plan.final_refs, start=1):
+        click.echo(f"  [{idx}] {ref}")
+    if ref_plan.truncated_for_model_limit:
+        click.echo("Warning: refs were truncated for this model/backend limit.")
+    for note in ref_plan.notes:
+        click.echo(f"Note: {note}")
     click.echo(f"Minutes: {minutes[0]}..{minutes[-1]} ({len(minutes)} images)")
     click.echo(f"Estimated cost: ${est_cost:.2f}")
     if est_cost > max_cost_usd:
@@ -221,7 +327,6 @@ def main(
         click.echo("Dry run complete: no API calls were made.")
         return
 
-    refs = apply_refs_mode(base_refs, refs_mode=refs_mode, out_dir=out_dir, artist_name=artist_name)
     backend = load_backend(model, replicate_model_id=replicate_model_id)
     click.echo(f"Resolved model id: {backend.model_id}")
 
@@ -234,7 +339,8 @@ def main(
 
         hh, mm = hhmm[:2], hhmm[2:]
         prompt = prompt_template.replace("{HH}", hh).replace("{MM}", mm)
-        result = backend.generate(prompt=prompt, refs=refs, quality=quality)
+        prompt = add_reference_guidance(prompt, model=model, plan=ref_plan, template_file=template_file)
+        result = backend.generate(prompt=prompt, refs=ref_plan.final_refs, quality=quality)
         jpeg_bytes, original_size = validate_to_jpeg_1920x1080(result.image_bytes)
 
         now = datetime.now()
@@ -253,8 +359,12 @@ def main(
             "quality": quality,
             "prompt_file": str(prompt_file),
             "prompt": prompt,
-            "refs": [str(r) for r in refs],
+            "artist_refs": [str(r) for r in artist_refs],
+            "selected_artist_refs": [str(r) for r in ref_plan.selected_artist_refs],
+            "refs": [str(r) for r in ref_plan.final_refs],
             "template_file": str(template_file) if template_file else None,
+            "truncated_for_model_limit": ref_plan.truncated_for_model_limit,
+            "ref_plan_notes": ref_plan.notes,
             "cost_usd": result.cost_usd,
             "request_id": result.request_id,
             "original_size_px": list(original_size),

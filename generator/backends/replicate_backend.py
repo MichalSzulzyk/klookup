@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.request import urlopen
 
 import replicate
 from replicate.exceptions import ReplicateError
@@ -14,9 +15,20 @@ except ModuleNotFoundError:
     from cost import estimate_cost
 
 
+def _read_replicate_output(value) -> bytes:
+    if hasattr(value, "read"):
+        return value.read()
+    if isinstance(value, (bytes, bytearray)):
+        return bytes(value)
+    if isinstance(value, str) and value.startswith(("http://", "https://")):
+        with urlopen(value) as response:
+            return response.read()
+    raise ValueError("Replicate output format unsupported")
+
+
 class ReplicateBackend:
     key = "replicate"
-    default_model_id = "black-forest-labs/flux-1.1-pro-ultra"
+    default_model_id = "black-forest-labs/flux-2-pro"
 
     def __init__(self, api_token: str, model_id: str | None = None):
         self.client = replicate.Client(api_token=api_token)
@@ -31,27 +43,24 @@ class ReplicateBackend:
         wait=wait_exponential(multiplier=1, min=4, max=20),
     )
     def generate(self, prompt: str, refs: list[Path], quality: str) -> GenResult:
-        guidance = {"low": 2.5, "medium": 3.5, "high": 5.0}[quality]
+        output_quality = {"low": 70, "medium": 82, "high": 92}[quality]
+        resolution = {"low": "1 MP", "medium": "1 MP", "high": "2 MP"}[quality]
         payload = {
             "prompt": prompt,
             "aspect_ratio": "16:9",
+            "resolution": resolution,
             "output_format": "jpg",
-            "guidance": guidance,
+            "output_quality": output_quality,
             "safety_tolerance": 2,
         }
         if refs:
-            uploaded = self.client.files.create(file=refs[0])
-            payload["image_prompt"] = uploaded.urls["get"]
+            payload["input_images"] = [self.client.files.create(file=ref).urls["get"] for ref in refs]
 
         out = self.client.run(self.model_id, input=payload)
         if isinstance(out, list) and out:
-            image_data = out[0].read() if hasattr(out[0], "read") else bytes(out[0])
-        elif hasattr(out, "read"):
-            image_data = out.read()
-        elif isinstance(out, (bytes, bytearray)):
-            image_data = bytes(out)
+            image_data = _read_replicate_output(out[0])
         else:
-            raise ValueError("Replicate output format unsupported")
+            image_data = _read_replicate_output(out)
 
         return GenResult(
             image_bytes=image_data,

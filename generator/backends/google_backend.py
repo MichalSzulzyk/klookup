@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import mimetypes
 import os
 from pathlib import Path
 
@@ -21,26 +22,32 @@ def _vertex_project_and_location() -> tuple[str | None, str | None]:
     return project, location
 
 
-def _make_genai_client(api_key: str | None) -> tuple[genai.Client, bool]:
-    """Vertex client enables ``edit_image`` (reference images). API-key client is text-only for Imagen."""
+def _make_vertex_client() -> genai.Client:
+    """Create a Vertex AI client for Imagen generation/editing."""
     project, location = _vertex_project_and_location()
-    if project and location:
-        return genai.Client(vertexai=True, project=project, location=location), True
-    if not api_key:
+    if not project or not location:
         raise ValueError(
-            "Set GOOGLE_API_KEY for the Gemini API, or set GOOGLE_CLOUD_PROJECT and "
-            "GOOGLE_CLOUD_LOCATION (with Application Default Credentials) for Vertex AI."
+            "Google backend requires Vertex AI. Set GOOGLE_CLOUD_PROJECT and "
+            "GOOGLE_CLOUD_LOCATION (or GOOGLE_VERTEX_PROJECT / GOOGLE_VERTEX_LOCATION) "
+            "and authenticate via Application Default Credentials."
         )
-    return genai.Client(api_key=api_key), False
+    return genai.Client(vertexai=True, project=project, location=location)
 
 
 def _prompt_with_reference_indices(prompt: str, n_refs: int) -> str:
     slots = ", ".join(f"[{i}]" for i in range(1, n_refs + 1))
     return (
-        f"Generate an image consistent with references {slots}: match palette, line quality, "
-        f"and graphic tone from those images. Treat [1] as the primary composition/layout "
-        f"guide when it looks like a template or clock face. Instructions: {prompt}"
+        f"Generate an image consistent with references {slots}. Follow any role instructions "
+        f"for individual references in the prompt, and match the artist references' palette, "
+        f"line quality, and graphic tone. Instructions: {prompt}"
     )
+
+
+def _image_from_path(path: Path) -> types.Image:
+    mime_type = mimetypes.guess_type(path.name)[0]
+    if mime_type not in {"image/jpeg", "image/png", "image/webp", "image/gif"}:
+        mime_type = "image/jpeg"
+    return types.Image(image_bytes=path.read_bytes(), mime_type=mime_type)
 
 
 def _style_reference_images(refs: list[Path]) -> list[types.StyleReferenceImage]:
@@ -49,7 +56,7 @@ def _style_reference_images(refs: list[Path]) -> list[types.StyleReferenceImage]
         out.append(
             types.StyleReferenceImage(
                 reference_id=i + 1,
-                reference_image=types.Image.from_file(location=str(path)),
+                reference_image=_image_from_path(path),
                 config=types.StyleReferenceConfig(
                     style_description=f"reference {i + 1} ({path.name})",
                 ),
@@ -62,8 +69,8 @@ class GoogleBackend:
     key = "google"
     model_id = "imagen-4.0-generate-001"
 
-    def __init__(self, api_key: str | None = None):
-        self.client, self._vertex = _make_genai_client(api_key)
+    def __init__(self):
+        self.client = _make_vertex_client()
         self._edit_model_id = os.getenv("GOOGLE_IMAGEN_EDIT_MODEL", self.model_id)
 
     def estimate_cost_usd(self, n_images: int, quality: str) -> float:
@@ -72,13 +79,6 @@ class GoogleBackend:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8))
     def generate(self, prompt: str, refs: list[Path], quality: str) -> GenResult:
         if refs:
-            if not self._vertex:
-                raise ValueError(
-                    "Reference images for Google Imagen need Vertex AI: set "
-                    "GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION and authenticate "
-                    "with Application Default Credentials. The Gemini Developer API "
-                    "(GOOGLE_API_KEY only) does not expose edit/reference paths for Imagen."
-                )
             augmented = _prompt_with_reference_indices(prompt, len(refs))
             response = self.client.models.edit_image(
                 model=self._edit_model_id,

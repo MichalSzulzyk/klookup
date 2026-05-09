@@ -1,0 +1,142 @@
+# Model Reference Guide
+
+Quick reference for how image references ("wsady") are handled in this project.
+
+## Key Terms
+
+- **Artist refs**: images from `--input`, used for visual style.
+- **Template**: image from `--template`, used only as clock layout/composition guidance.
+- **Final refs sent to API**: the actual list printed by CLI and sent to the selected backend.
+
+## Current Behavior
+
+### OpenAI
+
+- Model: `gpt-image-1`
+- Prompt: yes
+- Artist refs: selected by `--refs-mode`
+- Template: sent after artist refs, as layout only
+- API receives: selected artist refs + optional template
+- Meaning: OpenAI can use multiple reference images in one request, but artist refs drive style.
+
+### Replicate
+
+- Model: `black-forest-labs/flux-2-pro`
+- Prompt: yes
+- Artist refs: selected by `--refs-mode`
+- Template: sent as layout/composition ref when provided
+- API receives: max 8 refs via `input_images`
+- Meaning: if template is used, Replicate gets template + up to 7 artist refs.
+
+### Google Vertex
+
+- Model: `imagen-4.0-generate-001`
+- Prompt: yes
+- Artist refs: selected by `--refs-mode`
+- Template: sent as layout/composition ref when provided
+- API receives: max 4 refs via `edit_image`
+- Meaning: if template is used, Google gets template + up to 3 artist refs.
+
+## Important Notes
+
+- `--input` points to artist reference images (the "input refs").
+- `--template` is separate from artist refs.
+- `--refs-mode` applies only to artist refs.
+- Mosaic is built only from artist refs, never from template.
+- The CLI prints the final refs that are actually sent to the API.
+- Sidecar JSON stores `artist_refs`, `selected_artist_refs`, final `refs`, and truncation notes.
+
+## Safe Command Patterns (right now)
+
+### OpenAI (`gpt-image-1`)
+- Works with multiple refs.
+- `first` sends one artist ref plus optional template.
+- `mosaic` sends one artist mosaic plus optional template.
+
+### Replicate (Flux)
+- Treat as a multi-reference backend with FLUX.2 Pro.
+- Use:
+  - `--refs-mode first` for template + one artist ref,
+  - `--refs-mode mosaic` for template + one artist mosaic,
+  - or `--refs-mode all`; the CLI automatically sends template + up to 7 artist refs.
+
+### Google Vertex (Imagen edit path)
+- Keep refs at 4 or less.
+- Use:
+  - `--refs-mode first` (single ref),
+  - or `--refs-mode mosaic` (single mosaic ref),
+  - or `--refs-mode all`; the CLI automatically sends template + up to 3 artist refs.
+
+## Expected CLI Printout
+
+Before generation, check this block:
+
+```text
+Artist refs count: 7
+Selected artist refs count: 7
+Final refs sent to API count: 4
+  [1] graphics_template/klookup_template.jpg
+  [2] graphics_IO_minutes/oykuakarca_input/example-1.jpg
+  [3] graphics_IO_minutes/oykuakarca_input/example-2.jpg
+  [4] graphics_IO_minutes/oykuakarca_input/example-3.jpg
+Warning: refs were truncated for this model/backend limit.
+```
+
+If that list looks wrong, stop and change `--refs-mode` before running without `--dry-run`.
+
+## Test Commands
+
+### OpenAI dry-run
+
+```bash
+python -m generator.cli \
+  --input graphics_IO_minutes/oykuakarca_input \
+  --range 1017 1017 \
+  --prompt generator/prompts/general_04_detailed.txt \
+  --template graphics_template/klookup_template.jpg \
+  --model openai \
+  --refs-mode first \
+  --quality high \
+  --max-cost-usd 1 \
+  --dry-run
+```
+
+### Replicate dry-run
+
+```bash
+python -m generator.cli \
+  --input graphics_IO_minutes/oykuakarca_input \
+  --range 1017 1017 \
+  --prompt generator/prompts/general_04_detailed.txt \
+  --template graphics_template/klookup_template.jpg \
+  --model replicate \
+  --refs-mode all \
+  --quality high \
+  --max-cost-usd 1 \
+  --dry-run
+```
+
+### Google Vertex dry-run
+
+```bash
+python -m generator.cli \
+  --input graphics_IO_minutes/oykuakarca_input \
+  --range 1017 1017 \
+  --prompt generator/prompts/general_04_detailed.txt \
+  --template graphics_template/klookup_template.jpg \
+  --model google \
+  --refs-mode all \
+  --quality high \
+  --max-cost-usd 1 \
+  --dry-run
+```
+
+## Recommended Operating Rules
+
+1. For stable results across models, think in terms of:
+   - **single ref mode** (`first` or `mosaic`) vs
+   - **multi-ref mode** (`all`, useful for OpenAI and Replicate).
+2. For Replicate FLUX.2 Pro, never assume more than 8 refs are allowed.
+3. For Google Vertex, never assume more than 4 refs are allowed.
+4. Always check the CLI printout: `Final refs sent to API`.
+
