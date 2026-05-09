@@ -17,6 +17,7 @@ DIST_DIR = ROOT / "dist"
 GENERATED_DIR = ROOT / "graphics_IO_minutes"
 BLANK_DIR = ROOT / "graphics_blank_minutes"
 TARGET_SIZE = (1920, 1080)
+DEFAULT_WIDTHS = (1920,)
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 TIMESTAMP_RE = re.compile(r"_(\d{12})(?=\.[^.]+$)")
 
@@ -56,7 +57,27 @@ def parse_args() -> argparse.Namespace:
         default=78,
         help="WebP quality from 1 to 100.",
     )
+    parser.add_argument(
+        "--widths",
+        default=",".join(str(width) for width in DEFAULT_WIDTHS),
+        help="Comma-separated WebP widths. Keep the default 1920 for the simple MVP.",
+    )
+    parser.add_argument(
+        "--index-only",
+        action="store_true",
+        help="Only refresh minutes.json and static files; keep existing image assets.",
+    )
     return parser.parse_args()
+
+
+def parse_widths(value: str) -> tuple[int, ...]:
+    widths = sorted({int(item.strip()) for item in value.split(",") if item.strip()})
+    if not widths:
+        raise ValueError("At least one width is required.")
+    for width in widths:
+        if width <= 0:
+            raise ValueError("Widths must be positive integers.")
+    return tuple(widths)
 
 
 def load_artists() -> dict[str, dict[str, str]]:
@@ -148,26 +169,28 @@ def time_label(hhmm: str) -> str:
 
 def prepare_image(
     image_path: Path,
-    webp_path: Path,
-    jpg_path: Path | None,
+    output_path: Path,
+    output_format: str,
     fit: str,
     webp_quality: int,
+    size: tuple[int, int],
 ) -> None:
     with Image.open(image_path) as image:
         image = ImageOps.exif_transpose(image).convert("RGB")
         if fit == "cover":
-            image = ImageOps.fit(image, TARGET_SIZE, method=Image.Resampling.LANCZOS)
+            image = ImageOps.fit(image, size, method=Image.Resampling.LANCZOS)
         else:
             image = ImageOps.pad(
                 image,
-                TARGET_SIZE,
+                size,
                 method=Image.Resampling.LANCZOS,
                 color=(0, 0, 0),
                 centering=(0.5, 0.5),
             )
-        image.save(webp_path, "WEBP", quality=webp_quality, method=4)
-        if jpg_path is not None:
-            image.save(jpg_path, "JPEG", quality=84, optimize=True, progressive=True)
+        if output_format == "WEBP":
+            image.save(output_path, "WEBP", quality=webp_quality, method=4)
+        else:
+            image.save(output_path, "JPEG", quality=84, optimize=True, progressive=True)
 
 
 def copy_static_files(dist_dir: Path) -> None:
@@ -183,9 +206,12 @@ def build_index(
     fit: str,
     jpg_fallback: bool,
     webp_quality: int,
+    widths: tuple[int, ...],
+    write_images: bool,
 ) -> dict[str, Any]:
     assets_dir = dist_dir / "assets" / "minutes"
-    assets_dir.mkdir(parents=True, exist_ok=True)
+    if write_images:
+        assets_dir.mkdir(parents=True, exist_ok=True)
 
     selected_minutes = all_minutes()
     if limit is not None:
@@ -210,9 +236,31 @@ def build_index(
             )
             continue
 
-        webp_path = assets_dir / f"{hhmm}.webp"
+        variants = []
+        for width in widths:
+            height = round(width * TARGET_SIZE[1] / TARGET_SIZE[0])
+            webp_path = assets_dir / f"{hhmm}-{width}.webp"
+            if write_images:
+                prepare_image(
+                    source.image_path,
+                    webp_path,
+                    "WEBP",
+                    fit,
+                    webp_quality,
+                    (width, height),
+                )
+            variants.append(
+                {
+                    "width": width,
+                    "height": height,
+                    "src": f"assets/minutes/{hhmm}-{width}.webp",
+                }
+            )
+
+        largest_variant = variants[-1]
         jpg_path = assets_dir / f"{hhmm}.jpg" if jpg_fallback else None
-        prepare_image(source.image_path, webp_path, jpg_path, fit, webp_quality)
+        if write_images and jpg_path is not None:
+            prepare_image(source.image_path, jpg_path, "JPEG", fit, webp_quality, TARGET_SIZE)
 
         artist_data = artists.get(source.artist or "", {})
         artist_name = artist_data.get("name") or source.artist
@@ -221,7 +269,10 @@ def build_index(
             {
                 "hhmm": hhmm,
                 "label": time_label(hhmm),
-                "image": f"assets/minutes/{hhmm}.webp",
+                "image": largest_variant["src"],
+                "srcset": ", ".join(f"{variant['src']} {variant['width']}w" for variant in variants),
+                "sizes": "100vw",
+                "variants": variants,
                 "fallbackImage": f"assets/minutes/{hhmm}.jpg" if jpg_fallback else None,
                 "artist": source.artist,
                 "artistName": artist_name,
@@ -241,10 +292,11 @@ def build_index(
 
 def main() -> None:
     args = parse_args()
+    widths = parse_widths(args.widths)
     dist_dir = args.dist.resolve()
-    if dist_dir.exists():
+    if dist_dir.exists() and not args.index_only:
         shutil.rmtree(dist_dir)
-    dist_dir.mkdir(parents=True)
+    dist_dir.mkdir(parents=True, exist_ok=True)
 
     artists = load_artists()
     sources = discover_blanks(discover_generated())
@@ -256,6 +308,8 @@ def main() -> None:
         args.fit,
         args.jpg_fallback,
         args.webp_quality,
+        widths,
+        not args.index_only,
     )
 
     (dist_dir / "minutes.json").write_text(

@@ -36,6 +36,10 @@ function preload(record) {
     return;
   }
   const image = new Image();
+  if (record.srcset) {
+    image.srcset = record.srcset;
+    image.sizes = record.sizes ?? "100vw";
+  }
   image.src = record.image;
 }
 
@@ -73,9 +77,18 @@ function renderMinute(hhmm) {
   image.alt = record.artistName ? `${record.label}, ${record.artistName}` : record.label;
   image.onerror = () => {
     if (record.fallbackImage && !image.src.endsWith(record.fallbackImage)) {
+      image.removeAttribute("srcset");
+      image.removeAttribute("sizes");
       image.src = record.fallbackImage;
     }
   };
+  if (record.srcset) {
+    image.srcset = record.srcset;
+    image.sizes = record.sizes ?? "100vw";
+  } else {
+    image.removeAttribute("srcset");
+    image.removeAttribute("sizes");
+  }
   image.src = record.image;
   image.classList.add("is-active");
   layers[activeLayer].classList.remove("is-active");

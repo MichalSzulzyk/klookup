@@ -23,8 +23,17 @@ Build all available minutes:
 .venv/bin/python site/build.py
 ```
 
+Refresh links and metadata without regenerating images:
+
+```bash
+.venv/bin/python site/build.py --index-only
+```
+
 By default the build writes WebP images only. Add `--jpg-fallback` if a JPEG
 fallback is needed for a specific deployment target.
+
+The MVP build writes one 1920 px WebP per minute. Later, responsive variants can
+be generated with `--widths 768,1280,1920`.
 
 Artist portfolio links live in `site/artists.json`. Artist slugs should match output
 folder names without `_output`, for example `olkuolku_output` maps to `olkuolku`.
