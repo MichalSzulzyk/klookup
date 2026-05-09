@@ -4,7 +4,7 @@ const artistEl = document.querySelector("[data-artist]");
 const statusEl = document.querySelector("[data-status]");
 const fullscreenButton = document.querySelector("[data-fullscreen-button]");
 const portfolioLink = document.querySelector("[data-portfolio-link]");
-const CONTROLS_HIDE_DELAY_MS = 2800;
+const CONTROLS_HIDE_DELAY_MS = 3200;
 
 let minuteMap = new Map();
 let activeLayer = 0;
