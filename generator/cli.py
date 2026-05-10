@@ -115,13 +115,22 @@ class RefPlan:
     notes: list[str]
 
 
-def apply_refs_mode(refs: list[Path], refs_mode: str, out_dir: Path, artist_name: str) -> list[Path]:
+def apply_refs_mode(
+    refs: list[Path],
+    refs_mode: str,
+    out_dir: Path,
+    artist_name: str,
+    rotate_index: int | None = None,
+) -> list[Path]:
     if refs_mode == "all":
         return refs
     if refs_mode == "first":
         return refs[:1]
     if refs_mode == "mosaic":
         return [build_mosaic_ref(refs, out_dir=out_dir, artist_name=artist_name)]
+    if refs_mode == "rotate":
+        index = 0 if rotate_index is None else rotate_index
+        return [refs[index % len(refs)]]
     raise click.ClickException(f"Unsupported refs mode: {refs_mode}")
 
 
@@ -133,12 +142,14 @@ def build_ref_plan(
     artist_name: str,
     template_file: Path | None,
     replicate_model_id: str | None = None,
+    rotate_index: int | None = None,
 ) -> RefPlan:
     selected_artist_refs = apply_refs_mode(
         artist_refs,
         refs_mode=refs_mode,
         out_dir=out_dir,
         artist_name=artist_name,
+        rotate_index=rotate_index,
     )
     notes: list[str] = []
     truncated = False
@@ -192,7 +203,7 @@ def add_reference_guidance(prompt: str, model: str, plan: RefPlan, template_file
 def refs_count_for_mode(refs_count: int, refs_mode: str) -> int:
     if refs_mode == "all":
         return refs_count
-    if refs_mode in {"first", "mosaic"}:
+    if refs_mode in {"first", "mosaic", "rotate"}:
         return 1
     raise click.ClickException(f"Unsupported refs mode: {refs_mode}")
 
@@ -218,7 +229,7 @@ def refs_count_for_mode(refs_count: int, refs_mode: str) -> int:
 @click.option(
     "--refs-mode",
     default="all",
-    type=click.Choice(["all", "first", "mosaic"]),
+    type=click.Choice(["all", "first", "mosaic", "rotate"]),
     help="How to pass reference images into backends.",
 )
 @click.option("--artist", default=None, type=str)
@@ -258,15 +269,20 @@ def main(
         raise click.ClickException(f"Range has {len(minutes)} minutes, exceeds --minutes-limit={minutes_limit}")
 
     artist_refs = list_refs(input_dir)
-    ref_plan = build_ref_plan(
-        model=model,
-        artist_refs=artist_refs,
-        refs_mode=refs_mode,
-        out_dir=out_dir,
-        artist_name=artist_name,
-        template_file=template_file,
-        replicate_model_id=replicate_model_id,
-    )
+
+    def build_plan_for_minute(minute_index: int) -> RefPlan:
+        return build_ref_plan(
+            model=model,
+            artist_refs=artist_refs,
+            refs_mode=refs_mode,
+            out_dir=out_dir,
+            artist_name=artist_name,
+            template_file=template_file,
+            replicate_model_id=replicate_model_id,
+            rotate_index=minute_index if refs_mode == "rotate" else None,
+        )
+
+    ref_plan = build_plan_for_minute(0)
     prompt_template = read_prompt(prompt_file)
     est_cost = estimate_cost(model, quality, len(minutes))
     click.echo(f"Artist: {artist_name}")
@@ -277,10 +293,21 @@ def main(
     click.echo(f"Refs mode: {refs_mode}")
     click.echo(f"Template: {template_file if template_file else 'none'}")
     click.echo(f"Artist refs count: {len(artist_refs)}")
-    click.echo(f"Selected artist refs count: {len(ref_plan.selected_artist_refs)}")
-    click.echo(f"Final refs sent to API count: {len(ref_plan.final_refs)}")
-    for idx, ref in enumerate(ref_plan.final_refs, start=1):
-        click.echo(f"  [{idx}] {ref}")
+    if refs_mode == "rotate":
+        click.echo("Selected artist refs count: 1 per minute (rotating)")
+        click.echo(f"Final refs sent to API count: {len(ref_plan.final_refs)} per minute")
+        click.echo("Rotation preview:")
+        for minute_index, hhmm in enumerate(minutes[: min(len(minutes), 8)]):
+            minute_plan = build_plan_for_minute(minute_index)
+            refs_list = ", ".join(str(ref) for ref in minute_plan.final_refs)
+            click.echo(f"  {hhmm}: {refs_list}")
+        if len(minutes) > 8:
+            click.echo(f"  ... {len(minutes) - 8} more minutes")
+    else:
+        click.echo(f"Selected artist refs count: {len(ref_plan.selected_artist_refs)}")
+        click.echo(f"Final refs sent to API count: {len(ref_plan.final_refs)}")
+        for idx, ref in enumerate(ref_plan.final_refs, start=1):
+            click.echo(f"  [{idx}] {ref}")
     if ref_plan.truncated_for_model_limit:
         click.echo("Warning: refs were truncated for this model/backend limit.")
     for note in ref_plan.notes:
@@ -301,15 +328,16 @@ def main(
 
     generated = 0
     skipped = 0
-    for hhmm in tqdm(minutes, desc="Generating"):
+    for minute_index, hhmm in enumerate(tqdm(minutes, desc="Generating")):
         if find_latest(out_dir, hhmm, artist_name) is not None and not force:
             skipped += 1
             continue
 
+        minute_ref_plan = build_plan_for_minute(minute_index)
         hh, mm = hhmm[:2], hhmm[2:]
         prompt = prompt_template.replace("{HH}", hh).replace("{MM}", mm)
-        prompt = add_reference_guidance(prompt, model=model, plan=ref_plan, template_file=template_file)
-        result = backend.generate(prompt=prompt, refs=ref_plan.final_refs, quality=quality)
+        prompt = add_reference_guidance(prompt, model=model, plan=minute_ref_plan, template_file=template_file)
+        result = backend.generate(prompt=prompt, refs=minute_ref_plan.final_refs, quality=quality)
         jpeg_bytes, original_size = validate_to_jpeg_1920x1080(result.image_bytes)
 
         now = datetime.now()
@@ -329,11 +357,11 @@ def main(
             "prompt_file": str(prompt_file),
             "prompt": prompt,
             "artist_refs": [str(r) for r in artist_refs],
-            "selected_artist_refs": [str(r) for r in ref_plan.selected_artist_refs],
-            "refs": [str(r) for r in ref_plan.final_refs],
+            "selected_artist_refs": [str(r) for r in minute_ref_plan.selected_artist_refs],
+            "refs": [str(r) for r in minute_ref_plan.final_refs],
             "template_file": str(template_file) if template_file else None,
-            "truncated_for_model_limit": ref_plan.truncated_for_model_limit,
-            "ref_plan_notes": ref_plan.notes,
+            "truncated_for_model_limit": minute_ref_plan.truncated_for_model_limit,
+            "ref_plan_notes": minute_ref_plan.notes,
             "cost_usd": result.cost_usd,
             "request_id": result.request_id,
             "original_size_px": list(original_size),

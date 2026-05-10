@@ -75,6 +75,7 @@ Remove `--dry-run` to call APIs and write files.
 - `--template` is a separate clock layout reference.
 - `--refs-mode` applies only to artist references, not to the template.
 - `mosaic` is built only from artist references.
+- `rotate` uses one next artist reference per minute and loops when there are more minutes than refs.
 - The CLI prints `Final refs sent to API` before generation, so you can verify what each model will actually receive.
 
 Backend summary:

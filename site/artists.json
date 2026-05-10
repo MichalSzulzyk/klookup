@@ -38,5 +38,13 @@
   "andy_warhol": {
     "name": "Andy Warhol",
     "portfolio_url": "https://www.moma.org/artists/6246-andy-warhol"
+  },
+  "piotrdeptaklesta": {
+    "name": "Piotr Depta-Kleśta",
+    "portfolio_url": "https://www.behance.net/profile/piotrdeptaklesta"
+  },
+  "zuzannabukala": {
+    "name": "Zuzanna Bukała",
+    "portfolio_url": "https://zuzannabukala.com"
   }
 }

@@ -40,8 +40,9 @@ Replicate image model limits:
 - `--template` is separate from artist refs.
 - `--refs-mode` applies only to artist refs.
 - Mosaic is built only from artist refs, never from template.
+- Rotate uses one next artist ref per minute and loops back to the first ref when needed.
 - The CLI prints the final refs that are actually sent to the API.
-- Sidecar JSON stores `artist_refs`, `selected_artist_refs`, final `refs`, and truncation notes.
+- Sidecar JSON stores `artist_refs`, per-minute `selected_artist_refs`, final `refs`, and truncation notes.
 
 ## Safe Command Patterns (right now)
 
@@ -49,12 +50,14 @@ Replicate image model limits:
 - Works with multiple refs.
 - `first` sends one artist ref plus optional template.
 - `mosaic` sends one artist mosaic plus optional template.
+- `rotate` sends one rotating artist ref plus optional template per minute.
 
 ### Replicate
 - Treat as a multi-reference test backend.
 - Use:
   - `--refs-mode first` for template + one artist ref,
   - `--refs-mode mosaic` for template + one artist mosaic,
+  - `--refs-mode rotate` for template + one rotating artist ref per minute,
   - or `--refs-mode all`; the CLI automatically applies the selected model's ref limit.
 
 ## Expected CLI Printout
@@ -74,6 +77,18 @@ Warning: refs were truncated for this model/backend limit.
 ```
 
 If that list looks wrong, stop and change `--refs-mode` before running without `--dry-run`.
+
+For `rotate`, the printout shows a preview because refs change per minute:
+
+```text
+Refs mode: rotate
+Artist refs count: 4
+Selected artist refs count: 1 per minute (rotating)
+Final refs sent to API count: 2 per minute
+Rotation preview:
+  1032: graphics_template/klookup_template.jpg, graphics_IO_minutes/agaswietek_input/example-1.png
+  1033: graphics_template/klookup_template.jpg, graphics_IO_minutes/agaswietek_input/example-2.png
+```
 
 ## Test Commands
 
@@ -123,10 +138,27 @@ python -m generator.cli \
   --dry-run
 ```
 
+### Replicate Nano Banana 2 rotate dry-run
+
+```bash
+python -m generator.cli \
+  --input graphics_IO_minutes/oykuakarca_input \
+  --range 1017 1020 \
+  --prompt generator/prompts/general_04_detailed.txt \
+  --template graphics_template/klookup_template.jpg \
+  --model replicate \
+  --replicate-model-id google/nano-banana-2 \
+  --refs-mode rotate \
+  --quality medium \
+  --max-cost-usd 1 \
+  --dry-run
+```
+
 ## Recommended Operating Rules
 
 1. For stable results across models, think in terms of:
    - **single ref mode** (`first` or `mosaic`) vs
+   - **rotating single ref mode** (`rotate`) vs
    - **multi-ref mode** (`all`, useful for OpenAI and Replicate).
 2. For Replicate, check each model profile and the printed `Final refs sent to API`.
 3. Always check the CLI printout: `Final refs sent to API`.
