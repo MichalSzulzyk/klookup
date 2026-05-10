@@ -30,5 +30,13 @@
   "ulicka": {
     "name": "Weronika Ulicka",
     "portfolio_url": "https://www.behance.net/ulicka"
+  },
+  "gonzalomm": {
+    "name": "Gonzalo Martínez Moreno",
+    "portfolio_url": "https://www.behance.net/gonzalomm"
+  },
+  "andy_warhol": {
+    "name": "Andy Warhol",
+    "portfolio_url": "https://www.moma.org/artists/6246-andy-warhol"
   }
 }

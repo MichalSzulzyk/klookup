@@ -198,7 +198,6 @@ function renderMinute(hhmm) {
   }
   setPortfolioLink(record);
   showStatus("");
-  showControls();
   preload(minuteMap.get(nextHHMM(hhmm)));
 }
 
