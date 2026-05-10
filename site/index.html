@@ -27,6 +27,16 @@
             <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
           </svg>
         </button>
+        <button
+          class="info-button"
+          type="button"
+          data-info-button
+          aria-label="About Klookup"
+          aria-expanded="false"
+          aria-controls="about-panel"
+        >
+          i
+        </button>
         <a
           class="portfolio-button"
           data-portfolio-link
@@ -39,6 +49,46 @@
         <section class="meta">
           <p class="artist" data-artist>Ładowanie minut...</p>
         </section>
+        <div class="info-overlay" data-info-overlay hidden>
+          <section
+            class="info-panel"
+            id="about-panel"
+            aria-labelledby="about-title"
+            role="dialog"
+            aria-modal="true"
+          >
+            <button class="info-close" type="button" data-info-close aria-label="Close about panel">
+              ×
+            </button>
+            <h1 id="about-title">About Klookup</h1>
+            <p>
+              Klookup is an experimental visual clock<br />
+              made of 1,440 illustrated minutes.
+            </p>
+            <p>
+              Every minute is a small visual moment,<br />
+              part clock, part promotional banner,<br />
+              and an invitation to discover an artist’s portfolio.
+            </p>
+            <p>
+              Some minutes are created by artists.<br />
+              Others are AI-generated and inspired by selected artworks.
+            </p>
+            <p>
+              Want to create a minute, collaborate,<br />
+              or support the project?
+            </p>
+            <p>
+              Contact:
+              <a href="mailto:szulzyk@gmail.com">szulzyk@gmail.com</a>
+            </p>
+            <p>
+              Support:
+              <a href="https://buycoffee.to" target="_blank" rel="noopener noreferrer">buycoffee.to</a>
+              <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer">ko-fi.com</a>
+            </p>
+          </section>
+        </div>
       </div>
       <p class="status" data-status hidden></p>
     </main>

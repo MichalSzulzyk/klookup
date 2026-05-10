@@ -28,6 +28,7 @@ class MinuteSource:
     image_path: Path
     artist: str | None
     timestamp: str
+    credit_type: str | None
     is_generated: bool
 
 
@@ -105,6 +106,12 @@ def source_timestamp(path: Path) -> str:
     return f"{int(path.stat().st_mtime):012d}"
 
 
+def infer_credit_type(path: Path) -> str:
+    if TIMESTAMP_RE.search(path.name):
+        return "ai_inspired"
+    return "artist_made"
+
+
 def prefer_newer(current: MinuteSource | None, candidate: MinuteSource) -> MinuteSource:
     if current is None:
         return candidate
@@ -131,7 +138,8 @@ def discover_generated() -> dict[str, MinuteSource]:
                 image_path=image_path,
                 artist=artist,
                 timestamp=source_timestamp(image_path),
-                is_generated=True,
+                credit_type=infer_credit_type(image_path),
+                is_generated=TIMESTAMP_RE.search(image_path.name) is not None,
             )
             chosen[hhmm] = prefer_newer(chosen.get(hhmm), source)
 
@@ -153,6 +161,7 @@ def discover_blanks(existing: dict[str, MinuteSource]) -> dict[str, MinuteSource
             image_path=image_path,
             artist=None,
             timestamp=source_timestamp(image_path),
+            credit_type=None,
             is_generated=False,
         )
 
@@ -165,6 +174,13 @@ def all_minutes() -> list[str]:
 
 def time_label(hhmm: str) -> str:
     return f"{hhmm[:2]}:{hhmm[2:]}"
+
+
+def display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
 
 
 def prepare_image(
@@ -231,6 +247,7 @@ def build_index(
                     "artist": None,
                     "artistName": None,
                     "portfolioUrl": "",
+                    "creditType": None,
                     "isGenerated": False,
                 }
             )
@@ -277,6 +294,7 @@ def build_index(
                 "artist": source.artist,
                 "artistName": artist_name,
                 "portfolioUrl": portfolio_url,
+                "creditType": source.credit_type,
                 "isGenerated": source.is_generated,
             }
         )
@@ -300,6 +318,11 @@ def main() -> None:
 
     artists = load_artists()
     sources = discover_blanks(discover_generated())
+    missing_artists = sorted(
+        {source.artist for source in sources.values() if source.artist and source.artist not in artists}
+    )
+    for artist in missing_artists:
+        print(f"Warning: artist '{artist}' has no matching entry in site/artists.json.")
     index = build_index(
         sources,
         artists,
@@ -320,7 +343,7 @@ def main() -> None:
 
     print(
         f"Built {index['availableImages']} images across {index['totalRecords']} minute records "
-        f"into {dist_dir.relative_to(ROOT)}."
+        f"into {display_path(dist_dir)}."
     )
 
 

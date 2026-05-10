@@ -3,6 +3,9 @@ const metaEl = document.querySelector(".meta");
 const artistEl = document.querySelector("[data-artist]");
 const statusEl = document.querySelector("[data-status]");
 const fullscreenButton = document.querySelector("[data-fullscreen-button]");
+const infoButton = document.querySelector("[data-info-button]");
+const infoOverlay = document.querySelector("[data-info-overlay]");
+const infoClose = document.querySelector("[data-info-close]");
 const portfolioLink = document.querySelector("[data-portfolio-link]");
 const CONTROLS_HIDE_DELAY_MS = 3200;
 
@@ -11,6 +14,7 @@ let activeLayer = 0;
 let timerId = null;
 let controlsTimerId = null;
 let controlsPinned = false;
+let infoPanelOpen = false;
 
 function currentHHMM() {
   const params = new URLSearchParams(window.location.search);
@@ -48,14 +52,16 @@ function preload(record) {
 }
 
 function visibleControls() {
-  return [fullscreenButton, portfolioLink].filter((control) => control && !control.hidden);
+  return [fullscreenButton, infoButton, portfolioLink].filter((control) => control && !control.hidden);
 }
 
 function setPortfolioLink(record) {
   if (record?.portfolioUrl) {
+    const label = record.creditType === "artist_made" ? "View artist portfolio" : "View artist info";
     portfolioLink.href = record.portfolioUrl;
+    portfolioLink.textContent = label;
     portfolioLink.hidden = false;
-    portfolioLink.setAttribute("aria-label", `View portfolio: ${record.artistName ?? record.artist}`);
+    portfolioLink.setAttribute("aria-label", `${label}: ${record.artistName ?? record.artist}`);
     return;
   }
 
@@ -63,6 +69,19 @@ function setPortfolioLink(record) {
   portfolioLink.classList.remove("is-visible");
   portfolioLink.removeAttribute("href");
   portfolioLink.removeAttribute("aria-label");
+}
+
+function creditLabel(record) {
+  if (!record?.artistName) {
+    return "";
+  }
+  if (record.creditType === "ai_inspired") {
+    return `AI-generated · Inspired by ${record.artistName}`;
+  }
+  if (record.creditType === "artist_made") {
+    return `By ${record.artistName}`;
+  }
+  return "";
 }
 
 function showStatus(message) {
@@ -107,6 +126,9 @@ function pinControls() {
 }
 
 function releaseControls() {
+  if (infoPanelOpen) {
+    return;
+  }
   controlsPinned = false;
   showControls();
 }
@@ -120,6 +142,55 @@ function bindPinnedControl(control) {
   control.addEventListener("pointerleave", releaseControls);
   control.addEventListener("focus", pinControls);
   control.addEventListener("blur", releaseControls);
+}
+
+function openInfoPanel() {
+  if (!infoOverlay || !infoButton) {
+    return;
+  }
+  infoPanelOpen = true;
+  controlsPinned = true;
+  infoOverlay.hidden = false;
+  infoButton.setAttribute("aria-expanded", "true");
+  showControls();
+  infoClose?.focus();
+}
+
+function closeInfoPanel() {
+  if (!infoOverlay || !infoButton) {
+    return;
+  }
+  infoPanelOpen = false;
+  controlsPinned = false;
+  infoOverlay.hidden = true;
+  infoButton.setAttribute("aria-expanded", "false");
+  infoButton.focus();
+  showControls();
+}
+
+function setupInfoPanel() {
+  if (!infoButton || !infoOverlay) {
+    return;
+  }
+
+  infoButton.addEventListener("click", () => {
+    if (infoPanelOpen) {
+      closeInfoPanel();
+    } else {
+      openInfoPanel();
+    }
+  });
+  infoClose?.addEventListener("click", closeInfoPanel);
+  infoOverlay.addEventListener("click", (event) => {
+    if (event.target === infoOverlay) {
+      closeInfoPanel();
+    }
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && infoPanelOpen) {
+      closeInfoPanel();
+    }
+  });
 }
 
 async function toggleFullscreen() {
@@ -149,7 +220,9 @@ function setupFullscreen() {
 
 function setupControls() {
   setupFullscreen();
+  setupInfoPanel();
   bindPinnedControl(fullscreenButton);
+  bindPinnedControl(infoButton);
   bindPinnedControl(portfolioLink);
   window.addEventListener("pointermove", showControls, { passive: true });
   window.addEventListener("touchstart", showControls, { passive: true });
@@ -189,8 +262,9 @@ function renderMinute(hhmm) {
   layers[activeLayer].classList.remove("is-active");
   activeLayer = nextLayer;
 
-  if (record.artistName) {
-    artistEl.textContent = record.artistName;
+  const credit = creditLabel(record);
+  if (credit) {
+    artistEl.textContent = credit;
     metaEl.hidden = false;
   } else {
     artistEl.textContent = "";

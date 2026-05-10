@@ -74,7 +74,17 @@ be generated with `--widths 768,1280,1920`.
 ## Naming Rules
 
 Artist portfolio links live in `site/artists.json`. Artist slugs must match
-output folder names without `_output`, for example:
+output folder names without `_output`.
+
+AI-generated minutes use a timestamp suffix and are credited as
+`AI-generated · Inspired by [Artist]`:
+
+```text
+graphics_IO_minutes/andy_warhol_output/1200_andy_warhol_202605101156.jpg
+```
+
+Artist-made minutes do not use the timestamp suffix and are credited as
+`By [Artist]`:
 
 ```text
 graphics_IO_minutes/olkuolku_output/0000_olkuolku.png
@@ -95,3 +105,6 @@ live in `olkuolku_output`, not in another artist's output folder.
 If multiple generated files exist for the same `HHMM`, the build uses the newest
 timestamp. Files without a timestamp use their filesystem modification time. A
 blank minute is used only when no generated image exists for that minute.
+
+Sidecar JSON files are optional generation metadata. The public credit shown in
+the UI is inferred from the image filename, not from sidecar JSON contents.

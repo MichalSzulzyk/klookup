@@ -46,5 +46,21 @@
   "zuzannabukala": {
     "name": "Zuzanna Bukała",
     "portfolio_url": "https://zuzannabukala.com"
+  },
+  "otama-ki": {
+    "name": "Maki Ota",
+    "portfolio_url": "https://otama-ki.com"
+  },
+  "alexander_calder": {
+    "name": "Alexander Calder",
+    "portfolio_url": "https://www.guggenheim.org/artwork/artist/alexander-calder"
+  },
+  "robert_rauschenberg": {
+    "name": "Robert Rauschenberg",
+    "portfolio_url": "https://www.guggenheim.org/artwork/artist/robert-rauschenberg"
+  },
+  "kiyoshi_awazu": {
+    "name": "Kiyoshi Awazu",
+    "portfolio_url": "https://www.moma.org/artists/254-kiyoshi-awazu"
   }
 }
