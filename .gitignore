@@ -8,3 +8,6 @@ graphics_created_minutes/
 dist/
 *.pyc
 .DS_Store
+data/rijks/raw/
+data/rijks/previews/
+data/rijks/gallery/
