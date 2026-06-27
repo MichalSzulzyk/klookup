@@ -13,12 +13,26 @@ warnings.filterwarnings("ignore", message=".*urllib3 v2 only supports OpenSSL.*"
 
 BASE_URL = "https://data.rijksmuseum.nl"
 
+# SEARCHES = [
+#     {"name": "posters", "params": {"type": "poster", "imageAvailable": "true"}},
+#     {"name": "lithografie", "params": {"type": "print", "technique": "lithografie", "imageAvailable": "true"}},
+#     {"name": "zeefdruk", "params": {"type": "print", "technique": "zeefdruk", "imageAvailable": "true"}},
+#     {"name": "compositie", "params": {"title": "compositie", "imageAvailable": "true"}},
+#     {"name": "kleur", "params": {"description": "kleur", "imageAvailable": "true"}},
+# ]
+
 SEARCHES = [
+    # Grafika / projektowanie — najlepsze tropy pod zegar
     {"name": "posters", "params": {"type": "poster", "imageAvailable": "true"}},
     {"name": "lithografie", "params": {"type": "print", "technique": "lithografie", "imageAvailable": "true"}},
     {"name": "zeefdruk", "params": {"type": "print", "technique": "zeefdruk", "imageAvailable": "true"}},
     {"name": "compositie", "params": {"title": "compositie", "imageAvailable": "true"}},
     {"name": "kleur", "params": {"description": "kleur", "imageAvailable": "true"}},
+
+    # Dodatkowe duże kategorie do testów
+    {"name": "paintings", "params": {"type": "painting", "imageAvailable": "true"}},
+    {"name": "prints_all", "params": {"type": "print", "imageAvailable": "true"}},
+    {"name": "pastels", "params": {"type": "pastel", "imageAvailable": "true"}},
 ]
 
 PERIODS = {
@@ -208,17 +222,25 @@ def should_continue_scanning(page, max_pages):
 def search_object_ids(search, decade, max_pages):
     params = dict(search["params"])
     params["creationDate"] = decade
+    initial_params = dict(params)
 
     url = f"{BASE_URL}/search/collection"
     page = 1
     ids = []
+    pages_scanned = 0
+    total_items = 0
 
     print(f"\n=== {search['name']} | creationDate={decade} ===", flush=True)
 
     while should_continue_scanning(page, max_pages):
         data = fetch_json(url, params=params if page == 1 else None)
         ordered = data.get("orderedItems", [])
-        total = data.get("partOf", {}).get("totalItems", "?")
+        total = data.get("partOf", {}).get("totalItems", 0)
+
+        if isinstance(total, int):
+            total_items = total
+
+        pages_scanned += 1
 
         print(f"page {page}: {len(ordered)} items, totalItems={total}", flush=True)
 
@@ -236,7 +258,16 @@ def search_object_ids(search, decade, max_pages):
         page += 1
         time.sleep(0.2)
 
-    return ids
+    summary = {
+        "search_name": search["name"],
+        "creation_date": decade,
+        "query": "&".join([f"{k}={v}" for k, v in initial_params.items()]),
+        "total_items": total_items,
+        "pages_scanned": pages_scanned,
+        "objects_seen": len(ids),
+    }
+
+    return ids, summary
 
 
 def main():
@@ -260,10 +291,14 @@ def main():
 
     seen = set()
     rows = []
+    search_summaries = []
+    valid_by_search = defaultdict(int)
+    artists_by_search = defaultdict(set)
 
     for decade in PERIODS[args.period]:
         for search in SEARCHES:
-            object_ids = search_object_ids(search, decade, args.max_pages)
+            object_ids, search_summary = search_object_ids(search, decade, args.max_pages)
+            search_summaries.append(search_summary)
 
             for object_id in object_ids:
                 if object_id in seen:
@@ -301,6 +336,9 @@ def main():
 
                 rows.append(row)
 
+                valid_by_search[search["name"]] += 1
+                artists_by_search[search["name"]].add(artist)
+
                 print(f"  + {artist} | {year} | {title}", flush=True)
                 time.sleep(0.1)
 
@@ -311,6 +349,7 @@ def main():
 
     candidates_path = export_dir / "candidates.csv"
     artists_path = export_dir / "artists_summary.csv"
+    category_summary_path = export_dir / "category_summary.csv"
 
     with candidates_path.open("w", newline="", encoding="utf-8") as f:
         fieldnames = ["artist", "title", "year", "object_id", "visual_item_id", "source_query", "decade_query"]
@@ -324,6 +363,49 @@ def main():
 
         for artist, items in sorted(by_artist.items(), key=lambda x: len(x[1]), reverse=True):
             writer.writerow({"artist": artist, "count": len(items)})
+
+    category_totals = {}
+
+    for item in search_summaries:
+        name = item["search_name"]
+
+        if name not in category_totals:
+            category_totals[name] = {
+                "search_name": name,
+                "creation_dates": set(),
+                "total_items_sum": 0,
+                "pages_scanned": 0,
+                "objects_seen": 0,
+            }
+
+        category_totals[name]["creation_dates"].add(item["creation_date"])
+        category_totals[name]["total_items_sum"] += int(item.get("total_items") or 0)
+        category_totals[name]["pages_scanned"] += int(item.get("pages_scanned") or 0)
+        category_totals[name]["objects_seen"] += int(item.get("objects_seen") or 0)
+
+    with category_summary_path.open("w", newline="", encoding="utf-8") as f:
+        fieldnames = [
+            "search_name",
+            "creation_dates",
+            "total_items_sum",
+            "pages_scanned",
+            "objects_seen",
+            "valid_objects",
+            "artists_found",
+        ]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for name, item in sorted(category_totals.items(), key=lambda x: x[0]):
+            writer.writerow({
+                "search_name": name,
+                "creation_dates": " ".join(sorted(item["creation_dates"])),
+                "total_items_sum": item["total_items_sum"],
+                "pages_scanned": item["pages_scanned"],
+                "objects_seen": item["objects_seen"],
+                "valid_objects": valid_by_search.get(name, 0),
+                "artists_found": len(artists_by_search.get(name, set())),
+            })
 
     print("\n=== SUMMARY ===", flush=True)
     print(f"objects scanned: {len(seen)}", flush=True)
@@ -342,6 +424,7 @@ def main():
     print("\nSaved:", flush=True)
     print(f"  {candidates_path}", flush=True)
     print(f"  {artists_path}", flush=True)
+    print(f"  {category_summary_path}", flush=True)
 
 
 if __name__ == "__main__":

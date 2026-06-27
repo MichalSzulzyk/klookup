@@ -17,6 +17,7 @@ DEFAULT_CANDIDATES = Path("data/rijks/export/candidates.csv")
 DEFAULT_GALLERY_DIR = Path("data/rijks/gallery")
 DEFAULT_EXCLUDE_ARTISTS = Path("data/rijks/export/exclude_artists.txt")
 DEFAULT_EXCLUDE_OBJECTS = Path("data/rijks/export/exclude_objects.txt")
+DEFAULT_CATEGORY_SUMMARY = Path("data/rijks/export/category_summary.csv")
 
 
 def fetch_json(url):
@@ -203,7 +204,58 @@ def write_enriched_csv(enriched, output_path):
             writer.writerow({field: row.get(field, "") for field in fieldnames})
 
 
-def make_html(enriched, output_path, min_artist_items):
+def load_category_summary(path):
+    if not path.exists():
+        return []
+
+    with path.open("r", encoding="utf-8") as file:
+        return list(csv.DictReader(file))
+
+
+def make_html(enriched, output_path, min_artist_items, category_summary=None, period_label=""):
+    category_summary = category_summary or []
+
+    summary_rows = []
+
+    for row in category_summary:
+        summary_rows.append(
+            f"""
+            <tr>
+                <td>{html.escape(row.get("search_name", ""))}</td>
+                <td>{html.escape(row.get("creation_dates", ""))}</td>
+                <td>{html.escape(row.get("total_items_sum", ""))}</td>
+                <td>{html.escape(row.get("objects_seen", ""))}</td>
+                <td>{html.escape(row.get("valid_objects", ""))}</td>
+                <td>{html.escape(row.get("artists_found", ""))}</td>
+            </tr>
+            """
+        )
+
+    summary_html = ""
+
+    if summary_rows:
+        summary_html = f"""
+        <section class="dataset-summary">
+            <h2>Dataset overview</h2>
+            <p class="summary-note">Period: <strong>{html.escape(period_label)}</strong></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Dates searched</th>
+                        <th>Rijksmuseum total</th>
+                        <th>Scanned</th>
+                        <th>Valid</th>
+                        <th>Artists</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(summary_rows)}
+                </tbody>
+            </table>
+        </section>
+        """
+
     artist_nav = []
 
     for artist, items in enriched.items():
@@ -343,6 +395,42 @@ def make_html(enriched, output_path, min_artist_items):
             padding: 24px 32px 80px;
         }}
 
+        .dataset-summary {{
+            padding: 24px 32px;
+            border-bottom: 1px solid var(--line);
+            background: #111;
+        }}
+
+        .dataset-summary h2 {{
+            margin-top: 0;
+        }}
+
+        .summary-note {{
+            color: var(--muted);
+        }}
+
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: 13px;
+        }}
+
+        th, td {{
+            text-align: left;
+            padding: 9px 10px;
+            border-bottom: 1px solid var(--line);
+        }}
+
+        th {{
+            color: var(--accent);
+            font-weight: 600;
+        }}
+
+        td {{
+            color: var(--text);
+        }}
+
         .artist-section {{
             margin-bottom: 52px;
         }}
@@ -445,6 +533,8 @@ def make_html(enriched, output_path, min_artist_items):
         <p class="note">To hide artists or works, add names to <code>data/rijks/export/exclude_artists.txt</code> or object IDs to <code>data/rijks/export/exclude_objects.txt</code>, then regenerate.</p>
     </header>
 
+    {summary_html}
+
     <nav>
         {''.join(artist_nav)}
     </nav>
@@ -503,7 +593,17 @@ def main():
     html_path = output_dir / "index.html"
 
     write_enriched_csv(enriched, enriched_csv)
-    make_html(enriched, html_path, min_artist_items=args.min_artist_items)
+
+    category_summary = load_category_summary(DEFAULT_CATEGORY_SUMMARY)
+    period_label = "see scan_rijks.py output / category_summary.csv"
+
+    make_html(
+        enriched,
+        html_path,
+        min_artist_items=args.min_artist_items,
+        category_summary=category_summary,
+        period_label=period_label,
+    )
 
     print("\nSaved:", flush=True)
     print(f"  {enriched_csv}", flush=True)
